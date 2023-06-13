@@ -202,6 +202,57 @@ def GetDetections(ids, clienttoken, data_type = 'string'):# Returns df of detect
 
     return pd.concat([df_image_ids,df_detections], axis = 1), unique_occurrences, dict_image
 
+def GetDetections_FaF(ids, clienttoken, data_type = 'string'):# Returns df of detections per image ID and 
+                                    # total unique occurences of detections of all IDs
+                                    # variable dict_image (used in later functions)
+    if data_type == 'string':
+        list_image_id = [eval(ids[i]) for i in ids]
+    else:
+        list_image_id = ids
+    detections_per_image = []
+    dict_image_ids = []
+    dict_image = {}
+    #list of objects to remove 
+    vd = ["void--dynamic","void--static","void--unlabeled"]
+    
+    for i in tqdm (range(0,len(list_image_id)),desc="Loading…", ascii=False, ncols=75):
+        url = f"https://graph.mapillary.com/{list_image_id[i]}/detections?access_token={clienttoken}&fields=image,value"
+        response = rq.get(url)
+        rqcon = response.content
+        #Decode in order to get rid of bytestring 
+        deco = rqcon.decode()
+        result = json.loads(deco)
+        images = list(result.values())[0]
+        detection = []
+        for i in range(0,len(images)):
+            try:
+                val = str(images[i]["value"])
+                detection.append(val)
+                ID = str(images[i]["image"]["id"])
+                ID_image.append(ID)
+            except KeyError:
+                continue
+                
+        #Remove unwanted detections
+        indices_to_remove = [i for i, string in enumerate(detection) if string in vd]
+        new_detections = []
+        for i in range(len(detection)):
+            if i not in indices_to_remove:  
+                new_detections.append(detection[i])
+        dict_image_ids.append({'image_id': '{}'.format(ID)})
+        detections = count_occurrence(new_detections)
+        detections_per_image.append(detections)
+    
+        dict_image[ID] = new_detections
+    df_detections = pd.DataFrame.from_dict(detections_per_image)
+    df_image_ids = pd.DataFrame.from_dict(dict_image_ids)
+    df_grouped = pd.concat([df_image_ids, df_detections], axis = 1)
+    df_final = df_grouped.groupby(['image_id']).mean().reset_index()
+
+    return df_final, dict_image
+
+
+
 def PlotFractionImages(list_of_unique_occurences):
     sorted_unique_occurrences = sorted(list_of_unique_occurences.items(), key=lambda x:x[1])
     x_bar, y_bar = zip(*sorted_unique_occurrences)
