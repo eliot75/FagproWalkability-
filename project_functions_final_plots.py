@@ -82,9 +82,9 @@ def PlotShapefile(shapefile, bound = None):
         
         
 
-def PlotAssignedImages(shapefile, bounds, clienttoken,id_lst, buffer_size = 0.0001):
+def PlotAssignedImages(shapefile, bounds, clienttoken,id_lst, points, buffer_size = 0.0001):
     df_lines = lines(shapefile, bounds)
-    df_points = GetIdAndGeometry(id_lst, clienttoken)
+    df_points = points
     fig, ax = plt.subplots(figsize = (10,10))
     df_lines["geometry"].buffer(buffer_size, cap_style = 2).plot(ax=ax,alpha=0.5)   #With Buffer
     #df_lines["geometry"].plot(ax=ax,alpha=0.5)  #W/o buffer
@@ -93,10 +93,11 @@ def PlotAssignedImages(shapefile, bounds, clienttoken,id_lst, buffer_size = 0.00
     
     
     
-def GetPointsInPoly(shapefile, clienttoken, bound, id_lst, buffer=0.0001):
+def GetPointsInPoly(shapefile, clienttoken, bound, id_lst, points, buffer=0.0001):
     df_lines = lines(shapefile, bound)
     df_polygons = df_lines.copy()
-    df_points = GetIdAndGeometry(id_lst, clienttoken)
+    #points.set_geometry
+    df_points = points
     df_points.crs = df_lines.crs
     df_polygons.crs = df_lines.crs
     df_polygons["geometry"] = df_polygons["geometry"].buffer(buffer, cap_style = 2)
@@ -104,11 +105,11 @@ def GetPointsInPoly(shapefile, clienttoken, bound, id_lst, buffer=0.0001):
     return pointInPoly
 
 
-def PlotUnassignedPoints(shapefile, clienttoken, bound, id_lst, buffer = 0.0001):
+def PlotUnassignedPoints(shapefile, clienttoken, bound, id_lst,points, buffer = 0.0001):
     fig, ax = plt.subplots(figsize = (10,10))
     df_lines = lines(shapefile, bound)
-    pointInPoly = GetPointsInPoly(shapefile, clienttoken, bound, id_lst, buffer)
-    df_lines["geometry"].buffer(0.0001, cap_style = 2).plot(ax=ax,alpha=0.5)
+    pointInPoly = GetPointsInPoly(shapefile, clienttoken, bound,points,  id_lst, buffer)
+    df_lines["geometry"].buffer(buffer, cap_style = 2).plot(ax=ax,alpha=0.5)
     df_lines["geometry"].plot(ax=ax,alpha=0.5,color = "k")
     pointInPoly[pointInPoly['index_right'].isna()].plot(ax=ax,color = "r")
     
@@ -202,6 +203,8 @@ def GetDetections(ids, clienttoken, data_type = 'string'):# Returns df of detect
 
     return pd.concat([df_image_ids,df_detections], axis = 1), unique_occurrences, dict_image
 
+
+
 def PlotFractionImages(list_of_unique_occurences):
     sorted_unique_occurrences = sorted(list_of_unique_occurences.items(), key=lambda x:x[1])
     x_bar, y_bar = zip(*sorted_unique_occurrences)
@@ -258,7 +261,7 @@ def DFTransform(detections, pointInPoly, activity_df, dict_image, threshold = 0.
     encounters_todict = count_occurrence(encounters_tolist)
     sorted_unique_picture_encounters = sorted(encounters_todict.items(), key=lambda x:x[1])
     df_unique_detections=pd.DataFrame(list(sorted_unique_picture_encounters),columns=['detection','occurence'])
-    df_unique_detections = df_unique_detections[df_unique_detections['occurence'] >= threshold]
+    df_unique_detections = df_unique_detections[df_unique_detections['occurence'] >= threshold*(sum(df_unique_detections['occurence']))]
     detections_of_interest = df_unique_detections['detection'].to_list()
     
     #Now we have a list with the detections that we are interested in. We insert the coloumn names for edge ID, image ID 
