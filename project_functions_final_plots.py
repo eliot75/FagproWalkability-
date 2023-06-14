@@ -109,7 +109,7 @@ def PlotUnassignedPoints(shapefile, clienttoken, bound, id_lst,points, buffer = 
     fig, ax = plt.subplots(figsize = (10,10))
     df_lines = lines(shapefile, bound)
     pointInPoly = GetPointsInPoly(shapefile, clienttoken, bound,points,  id_lst, buffer)
-    df_lines["geometry"].buffer(0.0001, cap_style = 2).plot(ax=ax,alpha=0.5)
+    df_lines["geometry"].buffer(buffer, cap_style = 2).plot(ax=ax,alpha=0.5)
     df_lines["geometry"].plot(ax=ax,alpha=0.5,color = "k")
     pointInPoly[pointInPoly['index_right'].isna()].plot(ax=ax,color = "r")
     
@@ -203,54 +203,6 @@ def GetDetections(ids, clienttoken, data_type = 'string'):# Returns df of detect
 
     return pd.concat([df_image_ids,df_detections], axis = 1), unique_occurrences, dict_image
 
-def GetDetections_FaF(ids, clienttoken, data_type = 'string'):# Returns df of detections per image ID and 
-                                    # total unique occurences of detections of all IDs
-                                    # variable dict_image (used in later functions)
-    if data_type == 'string':
-        list_image_id = [eval(ids[i]) for i in ids]
-    else:
-        list_image_id = ids
-    detections_per_image = []
-    dict_image_ids = []
-    dict_image = {}
-    #list of objects to remove 
-    vd = ["void--dynamic","void--static","void--unlabeled"]
-    
-    for i in tqdm (range(0,len(list_image_id)),desc="Loading…", ascii=False, ncols=75):
-        url = f"https://graph.mapillary.com/{list_image_id[i]}/detections?access_token={clienttoken}&fields=image,value"
-        response = rq.get(url)
-        rqcon = response.content
-        #Decode in order to get rid of bytestring 
-        deco = rqcon.decode()
-        result = json.loads(deco)
-        images = list(result.values())[0]
-        detection = []
-        for i in range(0,len(images)):
-            try:
-                val = str(images[i]["value"])
-                detection.append(val)
-                ID = str(images[i]["image"]["id"])
-            except KeyError:
-                continue
-                
-        #Remove unwanted detections
-        indices_to_remove = [i for i, string in enumerate(detection) if string in vd]
-        new_detections = []
-        for i in range(len(detection)):
-            if i not in indices_to_remove:  
-                new_detections.append(detection[i])
-        dict_image_ids.append({'image_id': '{}'.format(ID)})
-        detections = count_occurrence(new_detections)
-        detections_per_image.append(detections)
-    
-        dict_image[ID] = new_detections
-    df_detections = pd.DataFrame.from_dict(detections_per_image)
-    df_image_ids = pd.DataFrame.from_dict(dict_image_ids)
-    df_grouped = pd.concat([df_image_ids, df_detections], axis = 1)
-    df_final = df_grouped.groupby(['image_id']).mean().reset_index()
-
-    return df_final, dict_image
-
 
 
 def PlotFractionImages(list_of_unique_occurences):
@@ -309,7 +261,7 @@ def DFTransform(detections, pointInPoly, activity_df, dict_image, threshold = 0.
     encounters_todict = count_occurrence(encounters_tolist)
     sorted_unique_picture_encounters = sorted(encounters_todict.items(), key=lambda x:x[1])
     df_unique_detections=pd.DataFrame(list(sorted_unique_picture_encounters),columns=['detection','occurence'])
-    df_unique_detections = df_unique_detections[df_unique_detections['occurence'] >= threshold]
+    df_unique_detections = df_unique_detections[df_unique_detections['occurence'] >= threshold*(sum(df_unique_detections['occurence']))]
     detections_of_interest = df_unique_detections['detection'].to_list()
     
     #Now we have a list with the detections that we are interested in. We insert the coloumn names for edge ID, image ID 
