@@ -1,9 +1,0 @@
-import requests as rq
-id = 6271859919532158
-clienttoken = "MLY|6271859919532158|486bcdece7a665eb89a5803f2994b4c9"
-clientsecret = "MLY|6271859919532158|891f85315dab6cea6fce4efaac3f1683"
-
-url = "https://graph.mapillary.com/images?access_token={}&fields=id&bbox=12.967,55.597,13.008,55.607".format(clienttoken)
-
-response = rq.get(url)
-print(response.content)
