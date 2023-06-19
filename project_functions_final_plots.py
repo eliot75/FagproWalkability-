@@ -317,9 +317,17 @@ def ReassignActivity(data):
             data.at[i, "Activity"] = 2
             
             
+
 def GetClasses(unique_occurences):
     labels=[]
     classes={}
+    keyList = list(unique_occurences.keys())
+    # initialize dictionary
+    old_to_new = {}
+    # iterating through the elements of list
+    for i in keyList:
+        old_to_new[i] = None
+      
     for i in range(len(list(unique_occurences))):
         labels.append(list(unique_occurences)[i])
     for j in range(len(labels)):
@@ -327,55 +335,125 @@ def GetClasses(unique_occurences):
         splits=s.split('--')
         cat=splits[0]
         if cat!='void':
-            if cat!='object'and cat!= 'nature' and cat!='construction':
+            if cat!='object'and cat!= 'nature' and cat!='construction' and cat!='general':
                 if cat not in classes:
                     classes[cat]=list(unique_occurences.values())[j]
+                    old_to_new[labels[j]]=cat
                 else:
                     classes[cat]+=list(unique_occurences.values())[j]
+                    old_to_new[labels[j]]=cat
             elif cat=='object' or cat=='nature':
-                if 'support' not in splits:
+                if 'support' not in splits and 'vehicle' not in splits :
                     if splits[1] not in classes:
                         classes[splits[1]]=list(unique_occurences.values())[j]
+                        old_to_new[labels[j]]=splits[1]
                     else:
                         classes[splits[1]]+=list(unique_occurences.values())[j] 
+                        old_to_new[labels[j]]=splits[1]
+                elif 'vehicle' in splits:
+                    if splits[-1] not in classes:
+                        classes[splits[-1]]=list(unique_occurences.values())[j]
+                        old_to_new[labels[j]]=splits[-1]
+                    else:
+                        classes[splits[-1]]+=list(unique_occurences.values())[j] 
+                        old_to_new[labels[j]]=splits[-1]
+                elif 'support' in splits: 
+                    if splits[-1] not in classes:
+                        classes[splits[-1]]=list(unique_occurences.values())[j]
+                        old_to_new[labels[j]]=splits[-1]
+                    else:
+                        classes[splits[-1]]+=list(unique_occurences.values())[j] 
+                        old_to_new[labels[j]]=splits[-1]
+                    
                 else: 
                     if 'utility' in splits: 
                         if 'utility pole' not in classes:
                             classes['utility pole']=list(unique_occurences.values())[j]
+                            old_to_new[labels[j]]='utility pole'
                         else:
                             classes['utility pole']+=list(unique_occurences.values())[j] 
-                    elif 'traffic' in splits: 
-                        if 'traffic sign frame'not in classes:
-                            classes['traffic sign frame']=list(unique_occurences.values())[j]
+                            old_to_new[labels[j]]='utility pole'
+                    elif 'traffic-sign' in splits: 
+                        if 'traffic-sign' not in classes:
+                            classes['traffic-sign']=list(unique_occurences.values())[j]
+                            old_to_new[labels[j]]='traffic-sign'
                         else:
-                            classes['traffic sign frame']+=list(unique_occurences.values())[j]   
-
-                    else: 
+                            classes['traffic-sign']+=list(unique_occurences.values())[j] 
+                            old_to_new[labels[j]]='traffic-sign'
+                    elif 'traffic-light' in splits: 
+                        if 'traffic-light'not in classes:
+                            classes['traffic-light']=list(unique_occurences.values())[j]
+                            old_to_new[labels[j]]='traffic-light'
+                        else:
+                            classes['traffic-light']+=list(unique_occurences.values())[j] 
+                            old_to_new[labels[j]]='traffic-light'
+                        
+                    elif 'pole' in splits:
+                        print(splits)
                         if 'pole'not in classes:
                             classes['pole']=list(unique_occurences.values())[j]
+                            old_to_new[labels[j]]='pole'
                         else:
                             classes['pole']+=list(unique_occurences.values())[j] 
-                        
+                            old_to_new[labels[j]]='pole'
+                    elif 'sign' in splits: 
+                        if 'sign'not in classes:
+                            classes['sign']=list(unique_occurences.values())[j]
+                            old_to_new[labels[j]]='sign'
+                        else:
+                            classes['sign']+=list(unique_occurences.values())[j] 
+                            old_to_new[labels[j]]='sign'
+
             elif cat=='construction':
 
                 if 'flat' not in splits:
                     
                     if splits[-1] not in classes:
                         classes[splits[-1]]=list(unique_occurences.values())[j]
+                        old_to_new[labels[j]]=splits[-1]
                     else:
                         classes[splits[-1]]+=list(unique_occurences.values())[j]
+                        old_to_new[labels[j]]=splits[-1]
                 else: 
                     
                     if splits[-1] not in classes:
                         classes[splits[-1]]=list(unique_occurences.values())[j]
+                        old_to_new[labels[j]]=splits[-1]
                     else:
                         classes[splits[-1]]+=list(unique_occurences.values())[j]
+                        old_to_new[labels[j]]=splits[-1]
 
+            elif cat=='general':
+                if splits[1] not in classes:
+                    classes[splits[1]]=list(unique_occurences.values())[j]
+                    old_to_new[labels[j]]=splits[1]
+                else:
+                    classes[splits[1]]+=list(unique_occurences.values())[j] 
+                    old_to_new[labels[j]]=splits[1]
 
-            
-
-         
+    return classes, old_to_new
+def ClassGrouping(df_detections,classes, old_to_new, unique_occurences):
+    new_to_old={}
+    oldlist=[]
     
-    return(classes)
+    for old in old_to_new:
+        new=old_to_new[old]
+        oldlist=[]
+        for k in old_to_new:
+            if old_to_new[k]==new :
+                oldlist.append(k)
         
-        
+        new_to_old[new]=oldlist
+    
+    newdf_detections=pd.DataFrame(0, index=np.arange(len(df_detections['image_id'])),columns=[k for k in new_to_old.keys()])
+    for new2 in new_to_old:
+
+        for old2 in new_to_old[new2]:
+            newdf_detections[new2]+=df_detections[old2]
+            #print(df_detections[old2])
+            #print(newdf_detections[new])
+    newdf_detections.drop(newdf_detections.iloc[:, 0:len(unique_occurences)],axis = 1)
+    newdf_detections.rename(columns = {0:'image_id'}, inplace = True)
+    #newdf_detections['Activity']=df_detections['Activity']
+    
+    return newdf_detections  
